@@ -1,12 +1,17 @@
+
+# .gitignore
+=======
 # .gitignore - VERSIÓN CORREGIDA
 
 # Entornos Virtuales
-venv/
-.venv/
 
-# Archivos de caché de Python
+venv/
 __pycache__/
 *.pyc
+
+.env
+*.db   # <-- ¡ESTA ES LA LÍNEA CLAVE!
+
 
 # Archivos de Base de Datos
 *.db
@@ -15,3 +20,4 @@ __pycache__/
 
 # Otros
 .env
+
