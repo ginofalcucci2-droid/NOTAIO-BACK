@@ -1,20 +1,33 @@
-# main.py - Versión con Endpoint de Login
+# main.py - VERSIÓN CON INDENTACIÓN CORREGIDA
 
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm # Un helper para formularios de login
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import models
 import database
 import schemas
-import security
-from auth import AuthHandler # ¡Importamos nuestra nueva herramienta!
+from auth import AuthHandler
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
-auth_handler = AuthHandler() # Creamos una instancia de nuestro manejador de auth
 
-# --- Función de Dependencia para la Sesión de BD ---
+# --- CONFIGURACIÓN DE CORS ---
+origins = [
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+auth_handler = AuthHandler()
+
 def get_db():
     db = database.SessionLocal()
     try:
@@ -48,13 +61,10 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-# ¡NUEVO ENDPOINT DE LOGIN!
 @app.post('/token', tags=['authentication'])
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # 1. Buscamos al usuario por su email (en el formulario de login, el 'username' es nuestro email)
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     
-    # 2. Si no existe el usuario o la contraseña es incorrecta, devolvemos un error
     if not user or not auth_handler.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -62,18 +72,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={'WWW-Authenticate': 'Bearer'},
         )
     
-    # 3. Si todo es correcto, creamos y devolvemos el token
     token = auth_handler.encode_token(user.id, user.email)
     return {'access_token': token, 'token_type': 'bearer'}
 
-
-# Ejemplo de RUTA PROTEGIDA
 @app.get('/protected', tags=['test'])
 def protected_route(user_info: dict = Depends(auth_handler.auth_wrapper)):
-    # Gracias a 'Depends', esta ruta solo funcionará si el frontend envía un token válido.
-    # 'user_info' contendrá los datos decodificados del token.
     return {'message': '¡Has accedido a una ruta protegida!', 'user': user_info}
-
 
 @app.get("/patients")
 def get_patients(db: Session = Depends(get_db)):
