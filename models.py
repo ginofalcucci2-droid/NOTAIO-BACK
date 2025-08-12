@@ -1,8 +1,12 @@
 # models.py - VERSIÓN FINAL Y CORRECTA
+
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
+
+
+# Esta es la base sobre la que se construyen los modelos
 
 Base = declarative_base()
 

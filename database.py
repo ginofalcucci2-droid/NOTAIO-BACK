@@ -1,5 +1,8 @@
+# database.py - VERSIÓN FINAL Y CORRECTA
+
 
 # database.py - VERSIÓN FINAL Y CORRECTA
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
