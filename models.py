@@ -1,16 +1,13 @@
-# models.py - VERSIÓN FINAL Y CORRECTA
+# models.py - VERSIÓN FINAL Y CORRECTA (DE VERDAD)
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
 
-
-# Esta es la base sobre la que se construyen los modelos
-
 Base = declarative_base()
 
-class UserRole(enum.Enum):
+class UserRole(str, enum.Enum): # Heredamos de 'str' para mejor compatibilidad
     PSICOLOGO = "psicologo"
     PACIENTE = "paciente"
 
@@ -19,7 +16,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(SQLAlchemyEnum(UserRole), nullable=False)
+    
+    # ¡AQUÍ ESTÁ EL CAMBIO CLAVE!
+    # Le decimos a SQLAlchemy que los valores válidos son los strings "psicologo" y "paciente".
+    role = Column(SQLAlchemyEnum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    
     patients = relationship("Patient", back_populates="owner")
 
 class Patient(Base):
