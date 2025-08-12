@@ -1,36 +1,32 @@
-# main.py - VERSIÓN CON CORS
+# main.py - Versión con conexión a BD
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # Importamos la herramienta de CORS
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+import models
+import database
+# Esta línea ahora está en database.py, pero la dejamos aquí por si acaso
+# para asegurar que las tablas se creen al arrancar.
+models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-# --- CONFIGURACIÓN DE CORS ---
-# Le decimos al backend que permita peticiones desde nuestro frontend de React.
-origins = [
-    "http://localhost:5173",
-]
+# --- Función de Dependencia ---
+# Esto nos dará una sesión de BD para cada petición de la API
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"], # Permite todas las cabeceras
-)
-
-# --- DATOS DE EJEMPLO ---
-patients_data = [
-    { "id": 1, "nombre": 'Mocho Monteros', "edad": 28, "dni": 'S/D', "telefono": 'S/D' },
-    { "id": 2, "nombre": 'Tano Falcone', "edad": 29, "dni": '39730806', "telefono": '3814634400' },
-    { "id": 3, "nombre": 'Pepito Juarez', "edad": 29, "dni": 'S/D', "telefono": 'S/D' },
-]
-
-# --- ENDPOINTS DE LA API ---
+# --- Endpoints de la API ---
 @app.get("/")
 def read_root():
     return {"message": "¡Bienvenido al backend de Notaio!"}
 
+# Endpoint modificado para usar la base de datos
 @app.get("/patients")
-def get_patients():
-    return patients_data    
+def get_patients(db: Session = Depends(get_db)):
+    # Consulta la tabla de pacientes y devuelve todos los resultados
+    patients = db.query(models.Patient).all()
+    return patients
