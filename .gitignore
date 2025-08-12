@@ -1,4 +1,4 @@
-# .gitignore
+# .gitignore - VERSIÓN CORREGIDA
 
 # Entornos Virtuales
 venv/
@@ -7,6 +7,11 @@ venv/
 # Archivos de caché de Python
 __pycache__/
 *.pyc
+
+# Archivos de Base de Datos
+*.db
+*.sqlite
+*.sqlite3
 
 # Otros
 .env
