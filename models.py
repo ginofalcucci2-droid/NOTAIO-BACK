@@ -2,10 +2,9 @@
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from database import Base # Importamos la Base común desde nuestro archivo database.py
 import enum
 
-Base = declarative_base()
 
 class UserRole(str, enum.Enum): # Heredamos de 'str' para mejor compatibilidad
     PSICOLOGO = "psicologo"
