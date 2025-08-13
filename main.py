@@ -1,4 +1,4 @@
-# main.py - VERSIÓN CON INDENTACIÓN CORREGIDA
+# main.py - VERSIÓN FINAL CON GESTIÓN DE PERFILES
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,16 +7,18 @@ from sqlalchemy.orm import Session
 import models
 import database
 import schemas
-from auth import AuthHandler
+from auth import auth_handler, get_current_user, get_db # Importaciones clave actualizadas
 
+# Crea las tablas en la base de datos si no existen (incluida la nueva 'profiles')
 models.Base.metadata.create_all(bind=database.engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="Notaio API",
+    description="El backend para la plataforma de psicología Notaio."
+)
 
 # --- CONFIGURACIÓN DE CORS ---
-origins = [
-    "http://localhost:5173",
-]
+origins = ["http://localhost:5173"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,22 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-auth_handler = AuthHandler()
+# --- Endpoints Públicos y de Autenticación ---
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# --- Endpoints de la API ---
-
-@app.get("/")
+@app.get("/", tags=["Root"])
 def read_root():
     return {"message": "¡Bienvenido al backend de Notaio!"}
 
-@app.post("/register", response_model=schemas.UserResponse)
+@app.post("/register", response_model=schemas.UserResponse, tags=["Authentication"])
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
@@ -49,9 +42,8 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     hashed_password = auth_handler.get_password_hash(user.password)
     
-    from models import UserRole
     try:
-        user_role_enum = UserRole[user.role.upper()]
+        user_role_enum = models.UserRole[user.role.upper()]
     except KeyError:
         raise HTTPException(status_code=400, detail=f"Rol '{user.role}' inválido.")
 
@@ -61,7 +53,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
-@app.post('/token', tags=['authentication'])
+@app.post('/token', tags=['Authentication'])
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     
@@ -72,14 +64,56 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={'WWW-Authenticate': 'Bearer'},
         )
     
-    token = auth_handler.encode_token(user.id, user.email)
+    token = auth_handler.encode_token(user_id=user.id, user_email=user.email)
     return {'access_token': token, 'token_type': 'bearer'}
 
-@app.get('/protected', tags=['test'])
-def protected_route(user_info: dict = Depends(auth_handler.auth_wrapper)):
-    return {'message': '¡Has accedido a una ruta protegida!', 'user': user_info}
+# --- Endpoints de Perfil de Usuario ---
 
-@app.get("/patients")
-def get_patients(db: Session = Depends(get_db)):
-    patients = db.query(models.Patient).all()
-    return patients
+@app.get("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])
+def read_user_profile(current_user: models.User = Depends(get_current_user)):
+    """
+    Obtiene el perfil del usuario autenticado.
+    Si el usuario no tiene un perfil, devuelve un error 404.
+    """
+    if not current_user.profile:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado. Por favor, cree uno.")
+    return current_user.profile
+
+
+@app.put("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])
+def update_user_profile(
+    profile_update: schemas.ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Crea o actualiza el perfil del usuario autenticado.
+    """
+    # Si el usuario ya tiene un perfil, lo actualizamos
+    if current_user.profile:
+        update_data = profile_update.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(current_user.profile, key, value)
+        
+        db.commit()
+        db.refresh(current_user.profile)
+        return current_user.profile
+    
+    # Si no tiene perfil, creamos uno nuevo
+    else:
+        # Aquí, ProfileCreate asegura que al menos se provea 'nombre_completo'
+        # pero como nuestro ProfileUpdate es más flexible, adaptamos los datos.
+        new_profile_data = profile_update.dict(exclude_unset=True)
+        if not new_profile_data.get("nombre_completo"):
+            raise HTTPException(status_code=422, detail="El campo 'nombre_completo' es obligatorio para crear un perfil.")
+
+        new_profile = models.Profile(**new_profile_data, user_id=current_user.id)
+        db.add(new_profile)
+        db.commit()
+        db.refresh(new_profile)
+        return new_profile
+
+# --- Endpoints existentes (Ej. Pacientes) ---
+
+# Hemos quitado /protected y /patients por ahora para enfocarnos en la funcionalidad
+# principal. Se pueden añadir de nuevo si es necesario.
