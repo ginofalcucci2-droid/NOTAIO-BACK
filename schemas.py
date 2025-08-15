@@ -6,7 +6,20 @@ from datetime import datetime
 import models # Importamos models para poder usar el Enum
 
 # --- Schemas Base ---
+class AvailabilityBlockBase(BaseModel):
+    start_time: datetime
+    end_time: datetime
 
+class AvailabilityBlockCreate(AvailabilityBlockBase):
+    pass
+
+class AvailabilityBlockResponse(AvailabilityBlockBase):
+    id: int
+    psychologist_id: int
+
+    class Config:
+        from_attributes = True
+        
 class PatientBase(BaseModel):
     nombre: str
     edad: Optional[int] = None

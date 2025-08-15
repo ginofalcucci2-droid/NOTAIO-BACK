@@ -79,3 +79,28 @@ class Appointment(Base):
     # Relaciones inversas
     psychologist = relationship("User", back_populates="appointments")
     patient = relationship("Patient", back_populates="appointments")
+    # En tu archivo models.py, añade esta nueva clase al final
+
+class AvailabilityBlock(Base):
+    __tablename__ = "availability_blocks"
+    id = Column(Integer, primary_key=True, index=True)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    
+    # Clave foránea al psicólogo que define esta disponibilidad
+    psychologist_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Relación para poder acceder desde el usuario
+    psychologist = relationship("User", back_populates="availability_blocks")
+
+# Y añade la relación inversa en la clase User:
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    # ... (tus otros campos se mantienen igual)
+    
+    # ... (tus otras relaciones se mantienen igual)
+    
+    # Un psicólogo define muchos bloques de disponibilidad
+    availability_blocks = relationship("AvailabilityBlock", back_populates="psychologist", cascade="all, delete-orphan")
