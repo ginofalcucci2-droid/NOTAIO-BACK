@@ -8,8 +8,7 @@ import models
 import database
 import schemas
 from auth import auth_handler, get_current_user, get_db
-
-# --- IMPORTAMOS EL NUEVO ROUTER ---
+from routers import patients, availability
 from routers import patients
 
 # Crea las tablas en la base de datos si no existen
@@ -33,6 +32,7 @@ app.add_middleware(
 
 # --- INCLUIMOS EL ROUTER DE PACIENTES ---
 app.include_router(patients.router)
+app.include_router(availability.router)
 
 
 # --- Endpoints Públicos y de Autenticación (sin cambios) ---
