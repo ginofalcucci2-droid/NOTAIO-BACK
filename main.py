@@ -1,4 +1,4 @@
-# main.py - VERSIÓN FINAL CON GESTIÓN DE PERFILES
+# main.py - ACTUALIZADO PARA INCLUIR EL ROUTER DE PACIENTES
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,9 +7,12 @@ from sqlalchemy.orm import Session
 import models
 import database
 import schemas
-from auth import auth_handler, get_current_user, get_db # Importaciones clave actualizadas
+from auth import auth_handler, get_current_user, get_db
 
-# Crea las tablas en la base de datos si no existen (incluida la nueva 'profiles')
+# --- IMPORTAMOS EL NUEVO ROUTER ---
+from routers import patients
+
+# Crea las tablas en la base de datos si no existen
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(
@@ -28,12 +31,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Endpoints Públicos y de Autenticación ---
+# --- INCLUIMOS EL ROUTER DE PACIENTES ---
+app.include_router(patients.router)
+
+
+# --- Endpoints Públicos y de Autenticación (sin cambios) ---
 
 @app.get("/", tags=["Root"])
 def read_root():
     return {"message": "¡Bienvenido al backend de Notaio!"}
 
+# ... (el resto de tu código de /register, /token, y /users/me/profile se mantiene igual)
+# ... (asegúrate de pegar el resto de tus funciones aquí)
+# ...
 @app.post("/register", response_model=schemas.UserResponse, tags=["Authentication"])
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -112,8 +122,3 @@ def update_user_profile(
         db.commit()
         db.refresh(new_profile)
         return new_profile
-
-# --- Endpoints existentes (Ej. Pacientes) ---
-
-# Hemos quitado /protected y /patients por ahora para enfocarnos en la funcionalidad
-# principal. Se pueden añadir de nuevo si es necesario.
