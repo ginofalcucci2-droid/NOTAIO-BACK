@@ -25,7 +25,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(SQLAlchemyEnum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    
+    __table_args__ = {'extend_existing': True}
     # RELACIONES
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     
@@ -34,6 +34,7 @@ class User(Base):
     
     # Un psicólogo tiene muchas citas
     appointments = relationship("Appointment", back_populates="psychologist")
+    availability_blocks = relationship("AvailabilityBlock", back_populates="psychologist", cascade="all, delete-orphan")
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -93,14 +94,3 @@ class AvailabilityBlock(Base):
     # Relación para poder acceder desde el usuario
     psychologist = relationship("User", back_populates="availability_blocks")
 
-# Y añade la relación inversa en la clase User:
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    # ... (tus otros campos se mantienen igual)
-    
-    # ... (tus otras relaciones se mantienen igual)
-    
-    # Un psicólogo define muchos bloques de disponibilidad
-    availability_blocks = relationship("AvailabilityBlock", back_populates="psychologist", cascade="all, delete-orphan")
