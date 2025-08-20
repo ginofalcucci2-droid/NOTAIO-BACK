@@ -44,23 +44,61 @@ def read_root():
 # ... (el resto de tu código de /register, /token, y /users/me/profile se mantiene igual)
 # ... (asegúrate de pegar el resto de tus funciones aquí)
 # ...
+# En main.py
+
 @app.post("/register", response_model=schemas.UserResponse, tags=["Authentication"])
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    
+    # --- ESPÍA #1: ¿QUÉ LLEGÓ EXACTAMENTE? ---
+    print("=============================================")
+    print(f"PASO 1: Datos recibidos por el endpoint: {user.dict()}")
+    print("=============================================")
+
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     hashed_password = auth_handler.get_password_hash(user.password)
     
-    try:
-        user_role_enum = models.UserRole[user.role.upper()]
-    except KeyError:
+    if user.role not in [e.value for e in models.UserRole]:
         raise HTTPException(status_code=400, detail=f"Rol '{user.role}' inválido.")
 
-    new_user = models.User(email=user.email, hashed_password=hashed_password, role=user_role_enum)
+    # --- ESPÍA #2: ¿QUÉ ROL VAMOS A USAR? ---
+    try:
+        user_role_enum = models.UserRole(user.role)
+        print(f"PASO 2: El string '{user.role}' se convirtió exitosamente al Enum: {user_role_enum}")
+    except Exception as e:
+        print(f"ERROR EN PASO 2: Falló la conversión del rol. Error: {e}")
+        raise HTTPException(status_code=400, detail="Error interno al procesar el rol.")
+
+    # --- ESPÍA #3: ¿QUÉ VAMOS A GUARDAR EN LA BASE DE DATOS? ---
+    new_user = models.User(
+        email=user.email, 
+        hashed_password=hashed_password, 
+        role=user_role_enum
+    )
+    print(f"PASO 3: Objeto 'User' a punto de ser guardado:")
+    print(f"  - Email: {new_user.email}")
+    print(f"  - Rol: {new_user.role} (Tipo: {type(new_user.role)})")
+    print("=============================================")
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # --- ESPÍA #4: ¿QUÉ SE GUARDÓ REALMENTE? ---
+    print(f"PASO 4: Usuario guardado en la BBDD. ID: {new_user.id}, Rol guardado: {new_user.role}")
+    print("=============================================")
+
+    # Creamos el perfil asociado
+    new_profile = models.Profile(
+        nombre_completo=user.full_name,
+        user_id=new_user.id
+    )
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_user)
+
     return new_user
 
 @app.post('/token', tags=['Authentication'])

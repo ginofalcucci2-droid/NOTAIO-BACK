@@ -24,7 +24,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(SQLAlchemyEnum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    # AHORA (CORREGIDO)
+    role = Column(String, nullable=False)
     __table_args__ = {'extend_existing': True}
     # RELACIONES
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -68,7 +69,7 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True, index=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    status = Column(SQLAlchemyEnum(AppointmentStatus), default=AppointmentStatus.AGENDADA, nullable=False)
+    status = Column(String, default=AppointmentStatus.AGENDADA.value, nullable=False)
     notes = Column(Text, nullable=True) # Notas pre o post sesión
     video_call_link = Column(String, nullable=True) # Para el Módulo 2
     

@@ -74,6 +74,7 @@ class AppointmentResponse(AppointmentBase):
 class UserCreate(BaseModel):
     email: str
     password: str
+    full_name: str
     role: str
 
 class UserResponse(BaseModel):
