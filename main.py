@@ -1,5 +1,5 @@
 # main.py - ACTUALIZADO PARA INCLUIR EL ROUTER DE PACIENTES
-
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -36,6 +36,19 @@ app.include_router(availability.router)
 
 
 # --- Endpoints Públicos y de Autenticación (sin cambios) ---
+@app.get("/psychologists", response_model=List[schemas.PsychologistPublicProfile], tags=["Marketplace"])
+def get_all_psychologists(db: Session = Depends(get_db)):
+    """
+    Devuelve una lista de perfiles públicos de todos los usuarios
+    que tienen el rol de 'psicologo'.
+    """
+    # 1. Buscamos todos los usuarios que son psicólogos
+    psychologist_users = db.query(models.User).filter(models.User.role == models.UserRole.PSICOLOGO).all()
+    
+    # 2. Extraemos sus perfiles (asegurándonos de que no sean nulos)
+    profiles = [user.profile for user in psychologist_users if user.profile is not None]
+    
+    return profiles
 
 @app.get("/", tags=["Root"])
 def read_root():
@@ -117,15 +130,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 # --- Endpoints de Perfil de Usuario ---
 
-@app.get("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])
-def read_user_profile(current_user: models.User = Depends(get_current_user)):
+@app.get("/users/me", response_model=schemas.UserDetailsResponse, tags=["User Profile"])
+def read_current_user_details(current_user: models.User = Depends(get_current_user)):
     """
-    Obtiene el perfil del usuario autenticado.
-    Si el usuario no tiene un perfil, devuelve un error 404.
+    Obtiene los detalles completos del usuario autenticado, incluyendo su perfil.
     """
-    if not current_user.profile:
-        raise HTTPException(status_code=404, detail="Perfil no encontrado. Por favor, cree uno.")
-    return current_user.profile
+    return current_user
 
 
 @app.put("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])

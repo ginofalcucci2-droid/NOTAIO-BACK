@@ -103,3 +103,23 @@ class ProfileResponse(ProfileBase):
     
     class Config:
         from_attributes = True
+    
+class UserDetailsResponse(BaseModel):
+    id: int
+    email: str
+    role: str
+    profile: Optional[ProfileResponse] = None # Anidamos el perfil
+
+    class Config:
+        from_attributes = True
+
+# Este schema define qué información del perfil es pública
+class PsychologistPublicProfile(BaseModel):
+    user_id: int # Para poder navegar a su perfil completo
+    nombre_completo: Optional[str] = None
+    foto_url: Optional[str] = None
+    descripcion: Optional[str] = None
+    # Podemos añadir más campos como especialidades si las guardamos en la BBDD
+
+    class Config:
+        from_attributes = True
