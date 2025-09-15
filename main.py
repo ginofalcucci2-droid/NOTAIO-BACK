@@ -1,5 +1,5 @@
 # main.py - ACTUALIZADO PARA INCLUIR EL ROUTER DE PACIENTES
-
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -36,6 +36,19 @@ app.include_router(availability.router)
 
 
 # --- Endpoints Públicos y de Autenticación (sin cambios) ---
+@app.get("/psychologists", response_model=List[schemas.PsychologistPublicProfile], tags=["Marketplace"])
+def get_all_psychologists(db: Session = Depends(get_db)):
+    """
+    Devuelve una lista de perfiles públicos de todos los usuarios
+    que tienen el rol de 'psicologo'.
+    """
+    # 1. Buscamos todos los usuarios que son psicólogos
+    psychologist_users = db.query(models.User).filter(models.User.role == models.UserRole.PSICOLOGO).all()
+    
+    # 2. Extraemos sus perfiles (asegurándonos de que no sean nulos)
+    profiles = [user.profile for user in psychologist_users if user.profile is not None]
+    
+    return profiles
 
 @app.get("/", tags=["Root"])
 def read_root():
@@ -44,23 +57,61 @@ def read_root():
 # ... (el resto de tu código de /register, /token, y /users/me/profile se mantiene igual)
 # ... (asegúrate de pegar el resto de tus funciones aquí)
 # ...
+# En main.py
+
 @app.post("/register", response_model=schemas.UserResponse, tags=["Authentication"])
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    
+    # --- ESPÍA #1: ¿QUÉ LLEGÓ EXACTAMENTE? ---
+    print("=============================================")
+    print(f"PASO 1: Datos recibidos por el endpoint: {user.dict()}")
+    print("=============================================")
+
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     hashed_password = auth_handler.get_password_hash(user.password)
     
-    try:
-        user_role_enum = models.UserRole[user.role.upper()]
-    except KeyError:
+    if user.role not in [e.value for e in models.UserRole]:
         raise HTTPException(status_code=400, detail=f"Rol '{user.role}' inválido.")
 
-    new_user = models.User(email=user.email, hashed_password=hashed_password, role=user_role_enum)
+    # --- ESPÍA #2: ¿QUÉ ROL VAMOS A USAR? ---
+    try:
+        user_role_enum = models.UserRole(user.role)
+        print(f"PASO 2: El string '{user.role}' se convirtió exitosamente al Enum: {user_role_enum}")
+    except Exception as e:
+        print(f"ERROR EN PASO 2: Falló la conversión del rol. Error: {e}")
+        raise HTTPException(status_code=400, detail="Error interno al procesar el rol.")
+
+    # --- ESPÍA #3: ¿QUÉ VAMOS A GUARDAR EN LA BASE DE DATOS? ---
+    new_user = models.User(
+        email=user.email, 
+        hashed_password=hashed_password, 
+        role=user_role_enum
+    )
+    print(f"PASO 3: Objeto 'User' a punto de ser guardado:")
+    print(f"  - Email: {new_user.email}")
+    print(f"  - Rol: {new_user.role} (Tipo: {type(new_user.role)})")
+    print("=============================================")
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # --- ESPÍA #4: ¿QUÉ SE GUARDÓ REALMENTE? ---
+    print(f"PASO 4: Usuario guardado en la BBDD. ID: {new_user.id}, Rol guardado: {new_user.role}")
+    print("=============================================")
+
+    # Creamos el perfil asociado
+    new_profile = models.Profile(
+        nombre_completo=user.full_name,
+        user_id=new_user.id
+    )
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_user)
+
     return new_user
 
 @app.post('/token', tags=['Authentication'])
@@ -79,15 +130,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 # --- Endpoints de Perfil de Usuario ---
 
-@app.get("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])
-def read_user_profile(current_user: models.User = Depends(get_current_user)):
+@app.get("/users/me", response_model=schemas.UserDetailsResponse, tags=["User Profile"])
+def read_current_user_details(current_user: models.User = Depends(get_current_user)):
     """
-    Obtiene el perfil del usuario autenticado.
-    Si el usuario no tiene un perfil, devuelve un error 404.
+    Obtiene los detalles completos del usuario autenticado, incluyendo su perfil.
     """
-    if not current_user.profile:
-        raise HTTPException(status_code=404, detail="Perfil no encontrado. Por favor, cree uno.")
-    return current_user.profile
+    return current_user
 
 
 @app.put("/users/me/profile", response_model=schemas.ProfileResponse, tags=["User Profile"])
