@@ -18,7 +18,7 @@ router = APIRouter(
 @router.post("/blocks", response_model=schemas.AvailabilityBlockResponse, status_code=status.HTTP_201_CREATED)
 def create_availability_block(
     block: schemas.AvailabilityBlockCreate,
-    db: Session = Depends(get_d b),
+    db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """
