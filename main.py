@@ -11,8 +11,9 @@ import schemas
 from auth import auth_handler, get_current_user, get_db
 from routers import patients, availability, session_requests
 
+
 # Crea las tablas en la base de datos si no existen
-models.Base.metadata.create_all(bind=database.engine)
+# models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(
     title="Notaio API",
@@ -36,6 +37,7 @@ app.include_router(availability.router)
 app.include_router(session_requests.router)
 
 
+
 # --- Endpoints Públicos y de Autenticación (sin cambios) ---
 @app.get("/psychologists", response_model=List[schemas.PsychologistPublicProfile], tags=["Marketplace"])
 def get_all_psychologists(db: Session = Depends(get_db)):
@@ -48,9 +50,8 @@ def get_all_psychologists(db: Session = Depends(get_db)):
     
     # 2. Extraemos sus perfiles (asegurándonos de que no sean nulos)
     profiles = [user.profile for user in psychologist_users if user.profile is not None]
-
+    
     return profiles
-
 
 @app.get(
     "/psychologists/{user_id}",
