@@ -1,9 +1,9 @@
 # schemas.py - ACTUALIZADO CON PACIENTES Y CITAS
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-import models # Importamos models para poder usar el Enum
+import models  # Importamos models para poder usar el Enum
 
 # --- Schemas Base ---
 class AvailabilityBlockBase(BaseModel):
@@ -90,6 +90,7 @@ class ProfileBase(BaseModel):
     foto_url: Optional[str] = None
     descripcion: Optional[str] = None
     numero_licencia: Optional[str] = None
+    tarifa: Optional[int] = None
 
 class ProfileCreate(ProfileBase):
     nombre_completo: str
@@ -100,7 +101,7 @@ class ProfileUpdate(ProfileBase):
 class ProfileResponse(ProfileBase):
     id: int
     user_id: int
-    
+
     class Config:
         from_attributes = True
     
@@ -119,7 +120,34 @@ class PsychologistPublicProfile(BaseModel):
     nombre_completo: Optional[str] = None
     foto_url: Optional[str] = None
     descripcion: Optional[str] = None
+    tarifa: Optional[int] = None
     # Podemos añadir más campos como especialidades si las guardamos en la BBDD
+
+    class Config:
+        from_attributes = True
+
+
+class PsychologistPublicProfileDetail(PsychologistPublicProfile):
+    availability: List[AvailabilityBlockResponse] = Field(default_factory=list)
+
+
+class SessionRequestBase(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    notes: Optional[str] = None
+
+
+class SessionRequestCreate(SessionRequestBase):
+    psychologist_id: int
+
+
+class SessionRequestResponse(SessionRequestBase):
+    id: int
+    psychologist_id: int
+    patient_id: int
+    status: models.SessionRequestStatus
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

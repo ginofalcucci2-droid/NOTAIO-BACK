@@ -1,15 +1,15 @@
 # main.py - ACTUALIZADO PARA INCLUIR EL ROUTER DE PACIENTES
-from typing import List
+from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from datetime import datetime
 import models
 import database
 import schemas
 from auth import auth_handler, get_current_user, get_db
-from routers import patients, availability
-from routers import patients
+from routers import patients, availability, session_requests
 
 # Crea las tablas en la base de datos si no existen
 models.Base.metadata.create_all(bind=database.engine)
@@ -33,6 +33,7 @@ app.add_middleware(
 # --- INCLUIMOS EL ROUTER DE PACIENTES ---
 app.include_router(patients.router)
 app.include_router(availability.router)
+app.include_router(session_requests.router)
 
 
 # --- Endpoints Públicos y de Autenticación (sin cambios) ---
@@ -47,8 +48,58 @@ def get_all_psychologists(db: Session = Depends(get_db)):
     
     # 2. Extraemos sus perfiles (asegurándonos de que no sean nulos)
     profiles = [user.profile for user in psychologist_users if user.profile is not None]
-    
+
     return profiles
+
+
+@app.get(
+    "/psychologists/{user_id}",
+    response_model=schemas.PsychologistPublicProfileDetail,
+    tags=["Marketplace"],
+)
+def get_psychologist_public_profile(
+    user_id: int,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+):
+    """Devuelve el perfil público completo de un psicólogo específico."""
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    if not user or user.role != models.UserRole.PSICOLOGO:
+        raise HTTPException(status_code=404, detail="Psicólogo no encontrado")
+
+    if not user.profile:
+        raise HTTPException(
+            status_code=404,
+            detail="El psicólogo aún no configuró su perfil público",
+        )
+
+    availability_query = db.query(models.AvailabilityBlock).filter(
+        models.AvailabilityBlock.psychologist_id == user.id
+    )
+
+    if start_date is not None:
+        availability_query = availability_query.filter(
+            models.AvailabilityBlock.end_time >= start_date
+        )
+
+    if end_date is not None:
+        availability_query = availability_query.filter(
+            models.AvailabilityBlock.start_time <= end_date
+        )
+
+    availability = availability_query.order_by(models.AvailabilityBlock.start_time.asc()).all()
+
+    return schemas.PsychologistPublicProfileDetail(
+        user_id=user.id,
+        nombre_completo=user.profile.nombre_completo,
+        foto_url=user.profile.foto_url,
+        descripcion=user.profile.descripcion,
+        tarifa=user.profile.tarifa,
+        availability=availability,
+    )
 
 @app.get("/", tags=["Root"])
 def read_root():

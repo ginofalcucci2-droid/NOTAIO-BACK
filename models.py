@@ -1,19 +1,16 @@
-# models.py - versión unificada y corregida
+# models.py - ACTUALIZADO CON CITAS (APPOINTMENTS)
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SQLAlchemyEnum, Text, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
+from datetime import datetime
 
-
-# -----------------------------
-# ENUMS
-# -----------------------------
+# --- ENUMS: Para estandarizar valores ---
 
 class UserRole(str, enum.Enum):
     PSICOLOGO = "psicologo"
     PACIENTE = "paciente"
-
 
 class AppointmentStatus(str, enum.Enum):
     AGENDADA = "agendada"
@@ -21,45 +18,43 @@ class AppointmentStatus(str, enum.Enum):
     CANCELADA_PACIENTE = "cancelada_paciente"
     CANCELADA_PSICOLOGO = "cancelada_psicologo"
 
+class SessionRequestStatus(str, enum.Enum):
+    PENDIENTE = "pendiente"
+    ACEPTADA = "aceptada"
+    RECHAZADA = "rechazada"
 
-# -----------------------------
-# TABLAS
-# -----------------------------
+# --- TABLAS PRINCIPALES ---
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-
-    # Guardamos el valor del enum (psicologo | paciente) usando el tipo correcto de SQLAlchemy
-    role = Column(
-        SQLAlchemyEnum(UserRole, values_callable=lambda x: [e.value for e in x]),
-        nullable=False
-    )
-
-    # Relaciones
-    profile = relationship(
-        "Profile",
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan"
-    )
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    # AHORA (CORREGIDO)
+    role = Column(String, nullable=False)
+    __table_args__ = {'extend_existing': True}
+    # RELACIONES
+    profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     # Un psicólogo (owner) tiene muchos pacientes
     patients = relationship("Patient", back_populates="owner")
 
     # Un psicólogo tiene muchas citas
     appointments = relationship("Appointment", back_populates="psychologist")
-    
-    # Bloques de disponibilidad del psicólogo
-    availability_blocks = relationship(
-        "AvailabilityBlock",
-        back_populates="psychologist",
-        cascade="all, delete-orphan"
+    availability_blocks = relationship("AvailabilityBlock", back_populates="psychologist", cascade="all, delete-orphan")
+    sent_session_requests = relationship(
+        "SessionRequest",
+        back_populates="patient",
+        cascade="all, delete-orphan",
+        foreign_keys="SessionRequest.patient_id",
     )
-
+    received_session_requests = relationship(
+        "SessionRequest",
+        back_populates="psychologist",
+        cascade="all, delete-orphan",
+        foreign_keys="SessionRequest.psychologist_id",
+    )
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -69,57 +64,47 @@ class Profile(Base):
     foto_url = Column(String, nullable=True)
     descripcion = Column(Text, nullable=True)
     numero_licencia = Column(String, nullable=True, unique=True)
-
+    tarifa = Column(Integer, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    user = relationship("User", back_populates="profile")
 
+    user = relationship("User", back_populates="profile")
 
 class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, index=True, nullable=False)
-    edad = Column(Integer, nullable=False)
-    dni = Column(String, nullable=True)
-    telefono = Column(String, nullable=True)
-
+    nombre = Column(String, index=True)
+    edad = Column(Integer)
+    dni = Column(String, nullable=True) # DNI puede ser opcional
+    telefono = Column(String, nullable=True) # Telefono puede ser opcional
+    
     # Clave foránea al psicólogo (User) dueño de este paciente
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="patients")
-
+    
     # Un paciente puede tener muchas citas
-    appointments = relationship(
-        "Appointment",
-        back_populates="patient",
-        cascade="all, delete-orphan"
-    )
+    appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
 
-
+# --- NUEVA TABLA DE CITAS (APPOINTMENTS) ---
 class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-
-    # Guardamos el valor del enum (agendada | completada | ...) usando el tipo correcto
-    status = Column(
-        SQLAlchemyEnum(AppointmentStatus, values_callable=lambda x: [e.value for e in x]),
-        default=AppointmentStatus.AGENDADA.value,
-        nullable=False
-    )
-
-    notes = Column(Text, nullable=True)           # Notas pre o post sesión
-    video_call_link = Column(String, nullable=True)
-
-    # Claves foráneas
-    psychologist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    status = Column(String, default=AppointmentStatus.AGENDADA.value, nullable=False)
+    notes = Column(Text, nullable=True) # Notas pre o post sesión
+    video_call_link = Column(String, nullable=True) # Para el Módulo 2
+    
+    # Clave foránea al psicólogo
+    psychologist_id = Column(Integer, ForeignKey("users.id"))
+    # Clave foránea al paciente
+    patient_id = Column(Integer, ForeignKey("patients.id"))
 
     # Relaciones inversas
     psychologist = relationship("User", back_populates="appointments")
     patient = relationship("Patient", back_populates="appointments")
-
+    # En tu archivo models.py, añade esta nueva clase al final
 
 class AvailabilityBlock(Base):
     __tablename__ = "availability_blocks"
@@ -129,7 +114,32 @@ class AvailabilityBlock(Base):
     end_time = Column(DateTime, nullable=False)
 
     # Clave foránea al psicólogo que define esta disponibilidad
-    psychologist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    psychologist_id = Column(Integer, ForeignKey("users.id"))
 
-    # Relación hacia el usuario psicólogo
+    # Relación para poder acceder desde el usuario
     psychologist = relationship("User", back_populates="availability_blocks")
+
+
+class SessionRequest(Base):
+    __tablename__ = "session_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    psychologist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    notes = Column(Text, nullable=True)
+    status = Column(String, default=SessionRequestStatus.PENDIENTE.value, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    psychologist = relationship(
+        "User",
+        foreign_keys=[psychologist_id],
+        back_populates="received_session_requests",
+    )
+    patient = relationship(
+        "User",
+        foreign_keys=[patient_id],
+        back_populates="sent_session_requests",
+    )
+
