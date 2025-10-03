@@ -33,7 +33,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
 
-    # Guardamos el valor del enum (psicologo | paciente)
+    # Guardamos el valor del enum (psicologo | paciente) usando el tipo correcto de SQLAlchemy
     role = Column(
         SQLAlchemyEnum(UserRole, values_callable=lambda x: [e.value for e in x]),
         nullable=False
@@ -52,7 +52,7 @@ class User(Base):
 
     # Un psicólogo tiene muchas citas
     appointments = relationship("Appointment", back_populates="psychologist")
-
+    
     # Bloques de disponibilidad del psicólogo
     availability_blocks = relationship(
         "AvailabilityBlock",
@@ -102,7 +102,7 @@ class Appointment(Base):
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
 
-    # Guardamos el valor del enum (agendada | completada | ...)
+    # Guardamos el valor del enum (agendada | completada | ...) usando el tipo correcto
     status = Column(
         SQLAlchemyEnum(AppointmentStatus, values_callable=lambda x: [e.value for e in x]),
         default=AppointmentStatus.AGENDADA.value,
